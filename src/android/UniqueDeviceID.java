@@ -9,11 +9,13 @@ import org.json.JSONException;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.provider.Settings.Secure;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 
 import java.lang.reflect.Method;
+import java.util.UUID;
 
 public class UniqueDeviceID extends CordovaPlugin {
 
@@ -28,11 +30,19 @@ public class UniqueDeviceID extends CordovaPlugin {
         this.callbackContext = callbackContext;
         try {
             if (action.equals("get")) {
-                if(this.hasPermission(permission)){
-                    getDeviceId();
-                }else{
-                    this.requestPermission(this, REQUEST_READ_PHONE_STATE, permission);
+                int myversion = Integer.parseInt(Build.VERSION.SDK);
+                if (myversion < 29) {
+                    if(this.hasPermission(permission)){
+                        getDeviceId();
+                    }else{
+                        this.requestPermission(this, REQUEST_READ_PHONE_STATE, permission);
+                    }
                 }
+                else
+                {
+                    getDeviceIdAndroid10();
+                }
+
             }else {
                 this.callbackContext.error("Invalid action");
                 return false;
@@ -52,6 +62,31 @@ public class UniqueDeviceID extends CordovaPlugin {
         }
     }
 
+    protected void getDeviceIdAndroid10(){
+        try {
+            Context context = cordova.getActivity().getApplicationContext();
+
+            String uuid;
+            String androidID = Secure.getString(context.getContentResolver(), Secure.ANDROID_ID);
+            String deviceID = UUID.randomUUID().toString();
+
+            if ("9774d56d682e549c".equals(androidID) || androidID == null) {
+                androidID = "";
+            }
+
+            if (deviceID == null) {
+                deviceID = "";
+            }
+            uuid = androidID + deviceID;
+            uuid = String.format("%32s", uuid).replace(' ', '0');
+            uuid = uuid.substring(0, 32);
+            uuid = uuid.replaceAll("(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})", "$1-$2-$3-$4-$5");
+
+            this.callbackContext.success(uuid);
+        }catch(Exception e ) {
+            this.callbackContext.error("Exception occurred: ".concat(e.getMessage()));
+        }
+    }
     protected void getDeviceId(){
         try {
             Context context = cordova.getActivity().getApplicationContext();
